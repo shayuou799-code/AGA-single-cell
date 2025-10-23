@@ -1,0 +1,1704 @@
+
+library(ggplot2)
+library(ggthemes)
+library(harmony)
+q =  theme_classic() + 
+  theme(panel.border = element_blank(),
+        axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+        axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))+
+  theme(legend.position=c(0.15,0.95))+
+  theme(legend.title = element_blank())+
+  theme(legend.text = element_text(colour="black", size = 16, face = "bold"))+
+  theme(axis.text.x=element_text(size=25, face = "bold"))+
+  theme(axis.title.x=element_text(size=25, face = "bold"))+
+  theme(axis.text.y=element_text(size=20, face = "bold"))+
+  theme(axis.title.y=element_text(size=25, face = "bold"))+
+  theme(plot.title = element_text(hjust = 0.5, vjust=0))
+source(paste(code_path, "BasicImport.R", sep ="/"))
+source(paste(code_path, "BD_Preprocess.R", sep ="/"))
+```
+
+
+#Preprocess all the samples separately.
+```{r setup, include=FALSE}
+Sample_files = list.files("./", pattern = "*.st")
+SampleIDs = c("A2", "N2", "A3", "N3", "A4", "N4", "D0730", "Z0730")
+
+for(i in 1:length(Sample_files)){
+  Samplefile = Sample_files[i]
+  SampleID = SampleIDs[i]
+  BD_Preprocessor(filename = Samplefile, 
+                SampleID = SampleID)
+}
+```
+
+#Analyze these samples separately (A1);
+```{r setup, include=FALSE}
+A1 = read_rds("./Processed_Files/D0730.rds")
+A1 = A1 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+A1 = A1 %>% FindNeighbors(reduction = "pca", dims = 1:11) %>% RunUMAP(reduction = "pca", dims = 1:11) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A1 = FindClusters(A1, resolution = k)
+    print(k)
+}
+p = clustree(A1, prefix = "RNA_snn_res.") 
+A1 = FindClusters(A1, resolution = 0.6)
+
+p = Embedding_plot(A1,  vis_type = "umap", group = "RNA_snn_res.0.6", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A1_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A1)
+write.xlsx(Diff_genes, "./Processed_Files/A1_Diffs.xlsx")
+write_rds(A1, file = "./Cleaned_Files/A1.rds")
+
+#C0: IL7R, CD3E --T cells;
+#C1: PECAM1,A2M -- Endothelials;
+#C2: KRT15, KRT5, KRT14 -- Outer Bulge;
+#C3: PLVAP, A2M, SPARC, PECAM1 --Endothelials;
+#C4: ACKR1, CCL14, --Endotheials;
+#C5: DCN, COL3A1, COL6A1, COL6A2; --Fibroblast;
+#C6: KRT6A, SFN, KRT6B, S100A7, SPINK5, DEFB1 -- 
+#C7: LYZ, CD1C, FCER1G -- Myeloid cells;
+#C8: KRT1, KRT10, KRTDAP; --IFE suprabasal;
+#c9: TPSB2, TPSAB1; -- mast cells;
+#C10: RGS5, ACTA2, TAGLN;
+#C11: COL1A2, COL3A1, COL12A1, COL11A1, POSTN, LUM; 
+#C12: FGFR3,LAMB4, WNT3 --;
+#C13: KRT16, KRT6C, CASP14, SERPINA3, GJB6, CD24, DSC2, GJB2, SOX9; --
+#C14: SAMD5, TUBB2B, CHST2, ANOS1, LHX2, DACT1, CTNND2;
+#C15: TYRP1, PMEL, DCT, MITF, MLANA; --Melanocyte;
+#C16: CCL21, MMRN1, LYVE1, TFF3; --Lymphatic EC;
+
+```
+
+#Analyze these samples separately (N1);
+```{r setup, include=FALSE}
+N1_matrix = matrix_formation("../AGA/Rawdata/N1/HF-AGA-Z-0730_BKDL202591660-1a_1_Expression_Data.st", "N1")
+N1 = scObject_create(N1_matrix, "N1")
+N1 = Doublet_removal(N1, percent = 0.12)
+
+N1 = N1 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+N1 = N1 %>% FindNeighbors(reduction = "pca", dims = 1:13) %>% RunUMAP(reduction = "pca", dims = 1:13) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N1 = FindClusters(N1, resolution = k)
+    print(k)
+}
+p = clustree(N1, prefix = "RNA_snn_res.") 
+N1 = FindClusters(N1, resolution = 0.4)
+
+p = Embedding_plot(N1,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N1_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N1)
+write.xlsx(Diff_genes, "./Processed_Files/N1_Diffs.xlsx")
+
+#C0: PLVAP, A2M, SPARC, PECAM1 --Endothelials;  
+#C1: DCN, COL3A1, COL6A1, COL6A2; --
+#C2: KRT1, KRT10, KRTDAP; --IFE suprabasal; 
+#C3: IL7R, CD3E --T cells;
+#C4: TNN, VCAN, CDH11, LUM; -- 
+#C5: KRT6B, KRT16, KRT17, KRT6C; 
+#C6: COL17A1, LAMB4, LAMB3, KRT15, FOXQ1, IMPA2; 
+#C7: KRT15, SFRP1, DIO2, TNC, NPNT -- Outer Bulge;                                      
+#C8: RGS5, ACTA2, TAGLN; 
+#c9: DEFB1, KRT77, KRT6A, SCEL, 
+#C10: TPSB2, TPSAB1; -- mast cells;
+#C11: LYZ, CD1C, FCER1G -- Myeloid cells; 
+#C12: CCL21, MMRN1, LYVE1, TFF3; --Lymphatic EC; 
+#C13: MLANA, SOX10, FOXA1, TYR, PMEL; --Melanocytes; 
+#C14: HEPHL1, DSG4, TGM3, KRT33A, 
+#C15: IGHGP, MZB1, CD79A; --B cells;
+#C16: AZGP1, ALOX15B, HMGCS2, LRRC26, AQP5; 
+
+write_rds(N1, file = "./Cleaned_Files/N1.rds")
+```
+
+#Analyze these samples separately (A2);
+```{r setup, include=FALSE}
+A2_matrix = matrix_formation("../AGA/Rawdata/A2/AGAHF0811-A2_BKDL202593666-1a_1_Expression_Data.st", "A2")
+A2 = scObject_create(A2_matrix, "A2")
+A2 = Doublet_removal(A2, percent = 0.12)
+
+A2 = A2 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+A2 = A2 %>% FindNeighbors(reduction = "pca", dims = 1:15) %>% RunUMAP(reduction = "pca", dims = 1:15) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A2 = FindClusters(A2, resolution = k)
+    print(k)
+}
+p = clustree(A2, prefix = "RNA_snn_res.") 
+A2 = FindClusters(A2, resolution = 0.4)
+
+p = Embedding_plot(A2,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A2_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A2)
+write.xlsx(Diff_genes, "./Processed_Files/A2_Diffs.xlsx")
+
+#C0: KRT15, DST, DIO2, SFRP1,  --Outer Bulge;   
+#C1: A2M, PECAM1, CLDN5, CD34 -- Endos
+#C2: PIP, DCD, KRT7, --Sweat gland cells; 
+#C3: ACKR1, CCL14, SELE, VWF -- Endos; 
+#C4: STC1, INSR, PLVAP, FLT1 -- Endos;
+#C5: KRT6A, KRT6B, KRT17, KRT16, KRT6C, KRT5; 
+#C6: KRT1, KRT10, KRTDAP, DMKN; 
+#C7: APOD, DCN, COL1A1;                              
+#C8: KLK5, LAMB4, KLK10, FGFBP1, IMPA2, SFN, CA12, DSG1, KLF5; 
+#c9: RGS5, ACTA2, TAGLN; 
+#C10: COL1A1, COL1A2, COL11A1, PRELP, CCN1, CCN2, SCUBE3 -- 
+#C11: IL7R, CD3D -- T cells; 
+#C12: RSPO4, EDN3, IGFBP3, INHBA, DIO3, WNT5A; 
+#C13: TPSB2, TPSAB1; -- Mast cells; 
+#C14: LYZ, FCER1G, GRP183 -- Myeloid cells; 
+#C15: PMEL, TYR, MLANA; --Melanocytes; 
+
+write_rds(A2, file = "./Cleaned_Files/A2.rds")
+```
+
+#Analyze these samples separately (N2);
+```{r setup, include=FALSE}
+N2 = read_rds("Processed_Files/N2.rds")
+
+N2 = N2 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+N2 = N2 %>% FindNeighbors(reduction = "pca", dims = 1:11) %>% RunUMAP(reduction = "pca", dims = 1:11) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N2 = FindClusters(N2, resolution = k)
+    print(k)
+}
+p = clustree(N2, prefix = "RNA_snn_res.") 
+N2 = FindClusters(N2, resolution = 0.3)
+
+p = Embedding_plot(N2,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N2_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N2)
+write.xlsx(Diff_genes, "./Processed_Files/N2_Diffs.xlsx")
+
+#C0: KRT15, DST, DIO2, SFRP1,  --Outer Bulge;   
+#C1: ACKR1, CCL14, SELE, VWF -- Endos;  
+#C2: KRT1, KRT10, KRTDAP, DMKN;               
+#C3: A2M, PECAM1, CLDN5, CD34 -- Endos
+#C4: APOD, COL1A1, DCN, COL1A2, COL3A1  -- 
+#C5: S100A7, S100A8, S100A9, KRT17, KLK5, KRT6A; 
+#C6: RGS5, ACTA2, TAGLN; 
+#C7: PIP, DCD, KRT7, --Sweat gland cells;                            
+#C8: LAMB4, WNT3, COL17A1, WNT4, TGFBI, FOXQ1, KRT15, KRT14; 
+#c9: KRTDAP, A2ML1, THEM5, EPHX3, CSTA -- 
+#C10: IL7R, CD3D -- T cells;
+#C11: RUNX3, DEFB1, TFCP2L1, GJB2, KRT6A; 
+#C12: KRT6C, SERPINA3, CBLN2, PDZRN3, PARM1, KRT17, KRT16, KRT6B, 
+#C13: TOP2A, MKI67 -- 
+#C14: LYZ, FCER1G, GRP183 -- Myeloid cells; 
+#C15: CCL21, LYVE1 -- LECs;
+
+write_rds(N2, file = "./Cleaned_Files/N2.rds")
+```
+
+#Analyze these samples separately (A3);
+```{r setup, include=FALSE}
+A3 = read_rds("Processed_Files/A3.rds")
+A3 = A3 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+A3 = A3 %>% FindNeighbors(reduction = "pca", dims = 1:12) %>% RunUMAP(reduction = "pca", dims = 1:12) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A3 = FindClusters(A3, resolution = k)
+    print(k)
+}
+p = clustree(A3, prefix = "RNA_snn_res.") 
+A3 = FindClusters(A3, resolution = 0.4)
+
+p = Embedding_plot(A3,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A3_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A3)
+write.xlsx(Diff_genes, "./Processed_Files/A3_Diffs.xlsx")
+
+#C0: ACKR1, CCL14, SELE, VWF -- Endos;  
+#C1: ADGRF5, FLT1, PODXL, SEMA3G, CLEC14A, SLC9A3R2; 
+#C2: A2M, PECAM1, CLDN5, CD34 -- Endos       
+#C3: KRT1, KRT10, KRTDAP, DMKN;            
+#C4: KRT15, DST, DIO2, SFRP1,  --Outer Bulge;    
+#C5: APOD, COL1A1, DCN, COL1A2, COL3A1  -- 
+#C6: S100A2, MOXD1, SAA1, KRT15, KLK5, KRT5 ;  
+#C7: IL7R, CD3D -- T cells;    PIP, DCD, KRT7, --Sweat gland cells;                            
+#C8: S100A7, S100A8, S100A9, KRT17, KLK5, KRT6A;     
+#c9: RGS5, ACTA2, TAGLN;  KRTDAP, A2ML1, THEM5, EPHX3, CSTA -- 
+#C10: KRT16, KRT6B, KRT17, KRT6A, S100A2, KRT6C, KRT5, SOX9, SERPINA3;
+#C11: COL17A1, KRT14, IGFBP3, KRT5, LAMB4, KRT15, TGFBI, FOXQ1; 
+#C12: TPSB2, TPSAB1 --Mast cells; 
+#C13: IGFBP3, EDN3, SERPINE2, WNT5A, INHBA, APCDD1, CPE; 
+#C14: DCT, TYRP1, PMEL, MLANA; --Melanocytes; 
+#C15: LYZ -- Myeloid cells; 
+
+write_rds(A3, file = "./Cleaned_Files/A3.rds")
+```
+
+#Analyze these samples separately (N3);
+```{r setup, include=FALSE}
+N3 = read_rds("Processed_Files/N3.rds")
+N3 = N3 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+N3 = N3 %>% FindNeighbors(reduction = "pca", dims = 1:12) %>% RunUMAP(reduction = "pca", dims = 1:12) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N3 = FindClusters(N3, resolution = k)
+    print(k)
+}
+p = clustree(N3, prefix = "RNA_snn_res.") 
+N3 = FindClusters(N3, resolution = 0.4)
+
+p = Embedding_plot(N3,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N3_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N3)
+write.xlsx(Diff_genes, "./Processed_Files/N3_Diffs.xlsx")
+
+#C0: ACKR1, CCL14, SELE, VWF -- Endos;  
+#C1: ADGRF5, FLT1, PODXL, SEMN3G, CLEC14A, SLC9N3R2; 
+#C2: A2M, PECAM1, CLDN5, CD34 -- Endos       
+#C3: KRT1, KRT10, KRTDAP, DMKN;            
+#C4: KRT15, DST, DIO2, SFRP1,  --Outer Bulge;    
+#C5: APOD, COL1A1, DCN, COL1A2, COL3A1  -- 
+#C6: S100A2, MOXD1, SAA1, KRT15, KLK5, KRT5 ;  
+#C7: IL7R, CD3D -- T cells;                    
+#C8: S100A7, S100A8, S100A9, KRT17, KLK5, KRT6A;     
+#c9: RGS5, ACTA2, TAGLN;
+#C10: KRT16, KRT6B, KRT17, KRT6A, S100A2, KRT6C, KRT5, SOX9, SERPINN3;
+#C11: COL17A1, KRT14, IGFBP3, KRT5, LAMB4, KRT15, TGFBI, FOXQ1; 
+#C12: TPSB2, TPSAB1 --Mast cells; 
+#C13: IGFBP3, EDN3, SERPINE2, WNT5A, INHBA, APCDD1, CPE; 
+#C14: DCT, TYRP1, PMEL, MLANA; --Melanocytes; 
+#C15: LYZ -- Myeloid cells; 
+
+write_rds(N3, file = "./Cleaned_Files/N3.rds")
+```
+
+#Analyze these samples separately (A4);
+```{r setup, include=FALSE}
+A4 = read_rds("Processed_Files/A4.rds")
+A4 = A4 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+  
+A4 = A4 %>% FindNeighbors(reduction = "pca", dims = 1:12) %>% RunUMAP(reduction = "pca", dims = 1:12) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A4 = FindClusters(A4, resolution = k)
+    print(k)
+}
+p = clustree(A4, prefix = "RNA_snn_res.") 
+A4 = FindClusters(A4, resolution = 0.4)
+
+p = Embedding_plot(A4,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A4_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A4)
+write.xlsx(Diff_genes, "./Processed_Files/A4_Diffs.xlsx")
+
+#C0: COL1A1, COL1A2, PRELP, TNN -- 
+#C1: FLT1,PLVAP, APOLD1, SLC9A3R2, CD34 -- 
+#C2: S100A2, KRT16, KRT17, KRT6C, KRT5, SERPINA3, CBLN2;  
+#C3: KRT15, DST, DIO2, SFRP1,  --Outer Bulge;          
+#C4: CST6, KRT6A, KRT6B, SPINK5, SBSN, KRT17, KRT6C, KRT16; 
+#C5: DCD, AQP3, DEFB1, IMPA2, APCDD1, KLF5; 
+#C6: ACKR1, CCL14, CLU, CD74, SELE, VWF; 
+#C7: KRT1, KRT10, KRTDAP, DMKN;                      
+#C8: RGS5, ACTA2, TAGLN;
+#c9: IL7R, CD3E -- T cells; 
+#C10: C3, PTGDS, CFD; 
+#C11: TPSB2, TPSAB1 --Mast cells; 
+#C12: DCT, TYRP1, PMEL, MLANA; --Melanocytes; 
+
+write_rds(A4, file = "./Cleaned_Files/A4.rds")
+```
+
+#Analyze these samples separately (N4);
+```{r setup, include=FALSE}
+N4_matrix = matrix_formation("../AGA/Rawdata/N4/AGAHF0902-N4_BKDL202598578-1a_1_Expression_Data.st", "N4")
+N4 = scObject_create(N4_matrix, "N4")
+N4 = Doublet_removal(N4, percent = 0.12)
+
+N4 = N4 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N4 = N4 %>% FindNeighbors(reduction = "pca", dims = 1:13) %>% RunUMAP(reduction = "pca", dims = 1:13) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N4 = FindClusters(N4, resolution = k)
+    print(k)
+}
+p = clustree(N4, prefix = "RNA_snn_res.") 
+N4 = FindClusters(N4, resolution = 0.4)
+
+p = Embedding_plot(N4,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N4_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N4)
+write.xlsx(Diff_genes, "./Processed_Files/N4_Diffs.xlsx")
+
+#C0: KRT17, S100A2, KRT16, KRT5, KRT6C; 
+#C1: FLT1, SLC9A3R2,CXCL12, ADGRF5, KDR; 
+#C2: CCL14, ACKR1, CLU, PECAM1, VWF, AQP1; 
+#C3: KRT15, DIO2, DST, SFRP1 -- Outer Bulge; 
+#C4: APOD, PTGDS, CCDC80, DCN, CFD; 
+#C5: S100A8, AQP3, S100A7, DEFB1, IMPA2, TMEM45A;
+#C6: RGS5, ACTA2, TAGLN, STEAP4; 
+#C7: COL1A1, COL11A1, COL1A2, PRELP, TNN, LUM, TMEM119;
+#C8: KRT1, KRT10, KRTDAP, KRT2, LY6D,DMKN;
+#C9: KRT6A, KRT6B, CST6, KRT16, KRT6C, CALML3, DSC2, GJB2, KRT17;
+#C10: IL7R, CD3E -- T cells;
+#C11: TPSB2, TPSAB1; 
+#C12: TOP2A, CENPF, MKI67;
+#C13: LYZ, CD74 -- Myeloid cells; 
+#C14: DCT, PMEL, TYRP1 -- Melanocytes;
+#C15: DCD, PIP --Sweat gland cells; 
+
+write_rds(N4, file = "./Cleaned_Files/N4.rds")
+```
+
+
+#Analyze these samples separately (A5);
+```{r setup, include=FALSE}
+
+#A5_matrix = matrix_formation("../AGA/Rawdata/A5/AGAHF0902-A5_BKDL202598578-1a_1_Expression_Data.st", "A5")
+#A5 = scObject_create(A5_matrix, "A5")
+#A5 = Doublet_removal(A5, percent = 0.12)
+A5 = read_rds("Processed_Files/A5.rds")
+
+A5 = A5 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A5 = A5 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A5 = FindClusters(A5, resolution = k)
+    print(k)
+}
+p = clustree(A5, prefix = "RNA_snn_res.") 
+A5 = FindClusters(A5, resolution = 0.4)
+
+p = Embedding_plot(A5,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A5_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A5)
+write.xlsx(Diff_genes, "./Processed_Files/A5_Diffs.xlsx")
+
+#C0: A2M, CD34, RAMP2, PODXL, PECAM1; 
+#C1: APOD, PTGDS, CCDC80, DCN, CFD;  FLT1, SLC9A3R2,CXCL12, ADGRF5, KDR; 
+#C2: KRT15, DIO2, DST, SFRP1 -- Outer Bulge;   
+#C3: KRT1, KRT10, KRTDAP, KRT2, LY6D,DMKN;
+#C4: CCL14, ACKR1, CLU, PECAM1, VWF, AQP1; 
+#C5: KRT16, KRT6C, KRT17, FABP5, KRT6B, SERPINA3;
+#C6: S100A7, S100A8, S100A9, SPINK5, KRT85, KRT6A, SERPINB4; 
+#C7: KDR, FLT1, APOLD1, PLVAP, COL4A1; 
+#C8: IL7R, CD3E -- T cells;
+#C9: RGS5, ACTA2, TAGLN, MYL9, 
+#C10: AKR1B10, LTF, MOXD1, COL17A1, IER3, CHI3L1, EGR1, SAA1, 
+#C11: EDN3, IGFBP3, RSPO4, SERPINE2, CRABP1, APCDD1, WNT5A, SFRP2, DIO2; 
+#C12: TPSB2, TPSAB1; 
+#C13: DCD, PIP --Sweat gland cells;  
+#C14: DCT, PMEL, TYRP1 -- Melanocytes;
+
+write_rds(A5, file = "./Cleaned_Files/A5.rds")
+```
+
+#Analyze these samples separately (N5);
+```{r setup, include=FALSE}
+
+#N5_matrix = matrix_formation("../AGA/Rawdata/N5/AGAHF0902-N5_BKDL202598578-1a_1_Expression_Data.st", "N5")
+#N5 = scObject_create(N5_matrix, "N5")
+#N5 = Doublet_removal(N5, percent = 0.12)
+N5 = read_rds("Processed_Files/N5.rds")
+
+N5 = N5 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N5 = N5 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N5 = FindClusters(N5, resolution = k)
+    print(k)
+}
+p = clustree(N5, prefix = "RNA_snn_res.") 
+N5 = FindClusters(N5, resolution = 0.4)
+
+p = Embedding_plot(N5,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N5_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N5)
+write.xlsx(Diff_genes, "./Processed_Files/N5_Diffs.xlsx")
+
+#C0: FLT1, PODXL, PLVAP, SCL9A3R2; 
+#C1: APOD, PTGDS, CCDC80, DCN, CFD;  
+#C2: CCL14, ACKR1, CLU, PECAM1, VWF, AQP1;      
+#C3: S100A7, S100A8, S100A9, SPINK5, KRT85, KRT6A;  
+#C4: KRT1, KRT10, KRTDAP, KRT2, LY6D,DMKN;
+#C5: KRT15, DIO2, DST, SFRP1 -- Outer Bulge;    
+#C6: IL7R, CD3E -- T cells;
+#C7: RGS5, ACTA2, TAGLN, MYL9,  KDR, FLT1, APOLD1, PLVAP, COL4A1; 
+#C8: SCUBE3, FST, COL10A1, LUM, COL3A1, COL1A1, COL1A2, SERPINE2;
+#C9: KRT16, KRT6C, KRT17, FABP5, KRT6B, SERPINA3;
+#C10: TPSB2, TPSAB1; --Mast cells; 
+#C11: COL17A1, DST, KRT14, IGFBP3, FGFR3, POSTN, WFDC5, KRT5, LAMB4; 
+#C12: LYZ, CD1C -- Myeloid cells;
+#C13: RSPO4, IGFBP3, HHIP, EDN3, INHBA, WNT5A, CRABP1, DIO3;
+#C14: DCT, PMEL, TYRP1 -- Melanocytes;
+#C15: TOP2A, MKI67;
+
+
+
+write_rds(N5, file = "./Cleaned_Files/N5.rds")
+```
+
+#Analyze these samples separately (A6);
+```{r setup, include=FALSE}
+
+A6_matrix = matrix_formation("../AGA/Rawdata/A6/JZsc416_FKDL202621031-1a_1_Expression_Data.st", "A6")
+A6 = scObject_create(A6_matrix, "A6")
+A6 = Doublet_removal(A6, percent = 0.12)
+
+A6 = A6 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A6 = A6 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A6 = FindClusters(A6, resolution = k)
+    print(k)
+}
+p = clustree(A6, prefix = "RNA_snn_res.") 
+A6 = FindClusters(A6, resolution = 0.4)
+
+p = Embedding_plot(A6,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A6_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A6)
+write.xlsx(Diff_genes, "./Processed_Files/A6_Diffs.xlsx")
+
+#C0: KRT1, KRT10, LY6D, FGFR3, FABP7; 
+#C1: S100A7, S100A8, S100A9, KRT1, KRT10, KRTDAP, SERPINB4, SERPINB3; 
+#C2: SERPINA3, KRT6B, PARM1, KRT17, KRT16, KRT5, KRT75;   
+#C3: CST6, SPINK5, IGFL2, PTN, DEFB1, KRT6B; 
+#C4: LTF, COL17A1, IGFBP3, KRT15, FGFR3, LAMB4, WNT3; 
+#C5: TOP2A, MKI67;   KRT15,   
+#C6: COL1A1, COL1A2, COL3A1, DCN, CCN2;  
+#C7: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C8: KRT85, KRT35, KRT31, PSORS1C2, LY6G6D, SELENBP1;
+#C9: CCL14, ACKR1, CLU, PECAM1, VWF, AQP1;      
+#C10: DST, SAA1, MOXD1, CHI3L1, CCL2, SEMA5A; 
+#C11: PI3, SPRR2E, SPRR2A, SPRR1B, SERPINB3, SERPINB4;
+#C12: RGS5, ACTA2, TAGLN, MYL9; 
+#C13: LYZ, CD1C -- Myeloid cells;  RSPO4, IGFBP3, HHIP, EDN3, INHBA, WNT5A, CRABP1, DIO3;
+#C14: IL7R, CD3E -- T cells; 
+#C15: TPSB2, TPSAB1; --Mast cells;  
+#C16: TCHH, KRT25, KRT71, KRT27, KRT73, KRT28; 
+#C17: DCD, PIP -- Sweat gland cells; 
+#C18: DCT, PMEL, TYRP1 -- Melanocytes;
+
+
+write_rds(A6, file = "./Cleaned_Files/A6.rds")
+```
+
+
+#Analyze these samples separately (N6);
+```{r setup, include=FALSE}
+
+N6_matrix = matrix_formation("../AGA/Rawdata/N6/JZsc415_FKDL202621030-1a_1_Expression_Data.st", "N6")
+N6 = scObject_create(N6_matrix, "N6")
+N6 = Doublet_removal(N6, percent = 0.12)
+
+N6 = N6 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N6 = N6 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N6 = FindClusters(N6, resolution = k)
+    print(k)
+}
+p = clustree(N6, prefix = "RNA_snn_res.") 
+N6 = FindClusters(N6, resolution = 0.4)
+
+p = Embedding_plot(N6,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N6_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N6)
+write.xlsx(Diff_genes, "./Processed_Files/N6_Diffs.xlsx")
+
+#C0: SERPINA3, CBLN2, KRT6, KRT16, KRT17; 
+#C1: DIO2, DST, SFRP1 -- Outer Bulge;    
+#C2: LTF, COL17A1, IGFBP3, KRT15, FGFR3, LAMB4, WNT3;
+#C3: KRT1, KRT10, AQP3, LY6D, SERPINB2, CHP2, TPPP3;   
+#C4: CST6, SPINK5, IGFL2, PTN, DEFB1, KRT6B; 
+#C5: KRT6A, KRT6B, KRT75, KRT16, KRT6C, KRT17; 
+#C6: KRT85, KRT35, KRT31, PSORS1C2, LY6G6D, SELENBP1; 
+#C7: CCL14, ACKR1, CLU, PECAM1, VWF, AQP1;      
+#C8: COL1A1, COL1A2, COL3A1, DCN, CCN2;  
+#C9: S100A7, S100A8, S100A9, KRT1, KRT10, KRTDAP, SERPINB4, SERPINB3; 
+#C10: APOD, CCDC80, IGFBP5, PTGDS, DCN, CFH, C1S, CFD;
+#C11: IL7R, CD3E -- T cells;
+#C12: RGS5, ACTA2, TAGLN, MYL9; 
+#C13: TOP2A, MKI67;   RSPO4, IGFBP3, HHIP, EDN3, INHBA, WNT5A, CRABP1, DIO3;
+#C14: DCD, PIP -- Sweat gland cells; 
+#C15: LYZ, CD1C -- Myeloid cells;  
+#C16: TPSB2, TPSAB1; --Mast cells;
+#C17: S100A3, KRT32, KRT82, SOX21, SP6, MT4, KRT25; 
+#C18: MYLK, ACTA2, MYH11, (Doublets);
+
+N6 = subset(N6, RNA_snn_res.0.4 != 18)
+write_rds(N6, file = "./Cleaned_Files/N6.rds")
+```
+
+
+#Analyze these samples separately (A7);
+```{r setup, include=FALSE}
+
+A7_matrix = matrix_formation("../AGA/Rawdata/A7/JZsc417_FKDL202621032-1a_1_Expression_Data.st", "A7")
+A7 = scObject_create(A7_matrix, "A7")
+A7 = Doublet_removal(A7, percent = 0.1)
+
+A7 = A7 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A7 = A7 %>% FindNeighbors(reduction = "pca", dims = 1:17) %>% RunUMAP(reduction = "pca", dims = 1:17) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A7 = FindClusters(A7, resolution = k)
+    print(k)
+}
+p = clustree(A7, prefix = "RNA_snn_res.") 
+A7 = FindClusters(A7, resolution = 0.4)
+
+p = Embedding_plot(A7,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A7_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A7)
+write.xlsx(Diff_genes, "./Processed_Files/A7_Diffs.xlsx")
+
+#C0: KRT6B, GJB6, CST6, KRT6A, S100A2, KRT16, GJB2, SDC1, SERPINA3, DSC2; 
+#C1: LTF, COL17A1, IGFBP3, KRT15, FGFR3, LAMB4, WNT3; 
+#C2: KRT1, KRT10, LY6D, AQP3;  
+#C3: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C4: CD34, PLVAP, A2M, FLT1, AQP1; 
+#C5: IGFBP3, COL7A1, LAMB4, FGFR3, IL1R2, AQP3, ASPN, TGFBI; 
+#C6: S100A7, S100A8, S100A9, KRT1, KRT10, KRTDAP, SERPINB4, SERPINB3;  
+#C7: COL1A1, COL1A2, COLL11A1, COL3A1; 
+#C8: RGS5, ACTA2, TAGLN; 
+#C9: CCL14, ACKR1, CLU, CD74; 
+#C10: TNC, LGR5, MGP, ANGPTL7;   
+#C11: TOP2A, MKI67;  
+#C12: IL7R, CD3E -- T cells;   
+#C13: KRT85, KRT35, KRT31, PRR9, MSX1;    
+#C14: TPSB2, TPSAB1; --Mast cells; 
+#C15: MYH11, ACTA2, TAGLN, MYL9, MCAM;  
+#C16: DCD, PIP -- Sweat gland cells; 
+write_rds(A7, file = "./Cleaned_Files/A7.rds")
+```
+
+
+#Analyze these samples separately (N7);
+```{r setup, include=FALSE}
+
+N7_matrix = matrix_formation("../AGA/Rawdata/N7/JZsc418_FKDL202621033-1a_1_Expression_Data.st", "N7")
+N7 = scObject_create(N7_matrix, "N7")
+N7 = Doublet_removal(N7, percent = 0.085)
+
+N7 = N7 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N7 = N7 %>% FindNeighbors(reduction = "pca", dims = 1:13) %>% RunUMAP(reduction = "pca", dims = 1:13) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N7 = FindClusters(N7, resolution = k)
+    print(k)
+}
+p = clustree(N7, prefix = "RNA_snn_res.") 
+N7 = FindClusters(N7, resolution = 0.4)
+
+p = Embedding_plot(N7,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N7_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N7)
+write.xlsx(Diff_genes, "./Processed_Files/N7_Diffs.xlsx")
+
+#C0: SERPINA3, KRT17, CBLN2; 
+#C1: ANGPTL7, COMP, THBS2, TNC, FGF18, LTBP2, THBS1, LGR5; 
+#C2: KRT6A, KRT6B, CASP14, S100A2, FABP5, KRT16; 
+#C3: COL1A1, COL1A2, COLL11A1, COL3A1;  
+#C4: TOP2A, MKI67; CD34, PLVAP, A2M, FLT1, AQP1; 
+#C5: PLVAP, FLT1, PECAM1, A2M; 
+#C6: CST6, KRT6A, KRT6B, KRT75, KRT6C, 
+#C7: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C8: MCM4, PCNA, MCM3, MCM6, DHFR;  
+#C9: RGS5, ACTA2, TAGLN;  CCL14, ACKR1, CLU, CD74; 
+#C10: APOD, CFH, DCN, CCDC80; 
+#C11: CCL14, CLU, ACKR1, CD74; 
+#C12: AQP3, DEFB1, MOXD1; 
+#C13:  IL7R, CD3E -- T cells;    
+#C14: KRT85, KRT35, KRT31, PRR9, MSX1;    
+#C15: MYH11, MYH11, MYLK, SYNML; 
+#C16: TPSB2, TPSAB1; --Mast cells; 
+#C17: DCD, PIP -- Sweat gland cells; 
+write_rds(N7, file = "./Cleaned_Files/N7.rds")
+```
+
+#Analyze these samples separately (A8);
+```{r setup, include=FALSE}
+
+A8_matrix = matrix_formation("../AGA/Rawdata/A8/JZsc419_FKDL202621034-1a_1_Expression_Data.st", "A8")
+A8 = scObject_create(A8_matrix, "A8")
+A8 = Doublet_removal(A8, percent = 0.15)
+
+A8 = A8 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A8 = A8 %>% FindNeighbors(reduction = "pca", dims = 1:20) %>% RunUMAP(reduction = "pca", dims = 1:20) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A8 = FindClusters(A8, resolution = k)
+    print(k)
+}
+p = clustree(A8, prefix = "RNA_snn_res.") 
+A8 = FindClusters(A8, resolution = 0.4)
+
+p = Embedding_plot(A8,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A8_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A8)
+write.xlsx(Diff_genes, "./Processed_Files/A8_Diffs.xlsx")
+
+#C0: COL1A1, COL1A2, COLL11A1, COL3A1;   KRT6B, GJB6, CST6, KRT6A, S100A2, KRT16, GJB2, SDC1, SERPINA3, DSC2; 
+#C1: CCL14, ACKR1, CLU, CD74;    LTF, COL17A1, IGFBP3, KRT15, FGFR3, LAMB4, WNT3; 
+#C2: PLVAP, FLT1, CD34, PODXL, KDR;   
+#C3: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C4: APOD, PTGDS, CFD, CCDC80, DCN; 
+#C5: KRT1, KRT10, LY6D, AQP3;    IGFBP3, COL7A1, LAMB4, FGFR3, IL1R2, AQP3, ASPN, TGFBI; 
+#C6: KRT16, KRT17, S100A2, FABP5, GJB6;  
+#C7: S100A8, S100A8, S100A9, CST6, KRT6B, KRT6A, SPINK5, IMPA2;
+#C8: RGS5, ACTA2, TAGLN; 
+#C9: IL7R, CD3E -- T cells;   
+#C10: TNC, LGR5, MGP, ANGPTL7;   
+#C11: TPSB2, TPSAB1; --Mast cells; 
+#C12: KRT85, KRT35, KRT31, PRR9, MSX1;    
+#C13: MYH11, ACTA2, RERGL, SORBS2, MYL9, PLN;
+#C14: COL17A1, IGFBP3, AQP3, KRT14, LAMB4; 
+#C15: LYZ, CD74, CD1C, C1QC; 
+#C16: EDN3, WNT5A, IGFBP3, DIO2;  
+#C17: DCT, PMEL, TYRP1; --Melanocytes;
+#C18: RGS5, CD36, SPARCL1; 
+#C19: CCL21, MMRN1, PROX1; 
+#C20: DCD, PIP -- Sweat gland cells; 
+#C21: CCL14, ACKR1, TSPAN7; 
+#C22: MYLK, MYH11, SYNM; 
+
+write_rds(A8, file = "./Cleaned_Files/A8.rds")
+```
+
+#Analyze these samples separately (N8);
+```{r setup, include=FALSE}
+
+N8_matrix = matrix_formation("../AGA/Rawdata/N8/JZsc420_FKDL202621035-1a_1_Expression_Data.st", "N8")
+N8 = scObject_create(N8_matrix, "N8")
+N8 = Doublet_removal(N8, percent = 0.1)
+
+N8 = N8 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N8 = N8 %>% FindNeighbors(reduction = "pca", dims = 1:17) %>% RunUMAP(reduction = "pca", dims = 1:17) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N8 = FindClusters(N8, resolution = k)
+    print(k)
+}
+p = clustree(N8, prefix = "RNA_snn_res.") 
+N8 = FindClusters(N8, resolution = 0.4)
+
+p = Embedding_plot(N8,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N8_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N8)
+write.xlsx(Diff_genes, "./Processed_Files/N8_Diffs.xlsx")
+
+#C0: KRT16, KRT17, CBLN2, S100A2, SERPINA3; 
+#C1: DIO2, DST, SFRP1 -- Outer Bulge;    
+#C2: COL1A1, APOD, DCN;            
+#C3: CCL14, ACKR1, CLU, CD74;    
+#C4: KRT1, KRT10, LY6D, AQP3;
+#C5: S100A7, S100A8, S100A9, CST6, KRT6B, KRT6A, SPINK5, IMPA2;
+#C6: PLVAP, FLT1, CD34, PODXL, KDR; 
+#C7: RGS5, ACTA2, TAGLN; 
+#C8: KRT1, KRT10, KRT2, SPINK5, CALML5, S100A7, S100A8; 
+#C9: KRT25, KRT71, SLC39A10, DLX3, MYCN, KRT35, MSX2;   
+#C10: IGFBP3, COL17A1, LAMB4, TGFBI, WNT4, FOXQ1;  
+#C11: TOP2A, MKI67;   TPSB2, TPSAB1; --Mast cells; 
+#C12: IL7R, CD3E -- T cells;   
+#C13: KRT85, KRT31, KRT35; 
+#C14: KRT6A, KRT6B, KRT6C, CST6, KRT16; 
+#C15: THBS2, ANGPTL7, TNC, LGR5;
+#C16: DCD, PIP -- Sweat gland cells;
+#C17: TPSB2, CPA3, TPSAB1;  
+#C18: DCT, PMEL, TYRP1; --Melanocytes;(Doublets);
+#C19: LYZ, CD74 -- Myeloid cells; 
+#C20: RGS5, CD36, KDR, RGCC, PLVAP; 
+
+N8 = subset(N8, RNA_snn_res.0.4 != 18)
+write_rds(N8, file = "./Cleaned_Files/N8.rds")
+```
+
+
+#Analyze these samples separately (A9);
+```{r setup, include=FALSE}
+
+A9_matrix = matrix_formation("../AGA/Rawdata/A9/AGAHF1130-A9_FKDL202623730-1a_1_Expression_Data.st", "A9")
+A9 = scObject_create(A9_matrix, "A9")
+A9 = Doublet_removal(A9, percent = 0.1)
+
+A9 = A9 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A9 = A9 %>% FindNeighbors(reduction = "pca", dims = 1:15) %>% RunUMAP(reduction = "pca", dims = 1:15) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A9 = FindClusters(A9, resolution = k)
+    print(k)
+}
+p = clustree(A9, prefix = "RNA_snn_res.") 
+A9 = FindClusters(A9, resolution = 0.5)
+
+p = Embedding_plot(A9,  vis_type = "umap", group = "RNA_snn_res.0.5", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A9_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A9)
+write.xlsx(Diff_genes, "./Processed_Files/A9_Diffs.xlsx")
+
+#C0: KRT1, KRT10, LY6D, AQP3;   
+#C1: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C2: CBLN2, S100A2, SERPINA3, KRT5, GJB6;  
+#C3: FLT1, A2M, PLVAP, CD34, PECAM1; 
+#C4: KRT6B, KRT16, KRT6C, KRT6A;
+#C5: COL1A1, COL1A2, COL3A1, DCN; 
+#C6: CCL14, ACKR1, CLU, CD74;  KRT16, KRT17, S100A2, FABP5, GJB6;  
+#C7: KRT5, KRT6B, KRT17, KRT14, S100A7, S100A8, SPINK5; 
+#C8: COL17A1, IGFBP3, AQP3, KRT14, LAMB4;   
+#C9: KRT1, KRT10, S100A9, S100A9, S100A9, CST6, KRT6B, KRT6A, SPINK5;
+#C10: RGS5, ACTA2, TAGLN;  
+#C11: KRT31, KRT85, KRT35, PRR9;  
+#C12: TCHH, KRT25, KRT71, KRT27, KRT73, KRT28; 
+#C13: KRT35, ID3, MSX2, MSX1, KRT32;
+#C14: TNC, LGR5, MGP, ANGPTL7;   
+#C15: TOP2A, MKI67;  
+#C16: TOP2A, MKI67;  EDN3, WNT5A, IGFBP3, DIO2;  
+#C17: CD3E, IL7R -- T cells; 
+#C18: LYZ, CD74, CD1C, C1QC; 
+#C19: TPSB2, TPSAB1; --Mast cells; 
+#C20: DCT, PMEL, TYRP1; --Melanocytes;
+
+write_rds(A9, file = "./Cleaned_Files/A9.rds")
+```
+
+
+#Analyze these samples separately (N9);
+```{r setup, include=FALSE}
+
+N9_matrix = matrix_formation("../AGA/Rawdata/N9/AGAHF1130-N9_FKDL202623731-1a_1_Expression_Data.st", "N9")
+N9 = scObject_create(N9_matrix, "N9")
+N9 = Doublet_removal(N9, percent = 0.1)
+
+N9 = N9 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N9 = N9 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N9 = FindClusters(N9, resolution = k)
+    print(k)
+}
+p = clustree(N9, prefix = "RNA_snn_res.") 
+N9 = FindClusters(N9, resolution = 0.4)
+
+p = Embedding_plot(N9,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N9_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N9)
+write.xlsx(Diff_genes, "./Processed_Files/N9_Diffs.xlsx")
+
+#C0: FLT1, A2M, PLVAP, CD34, PECAM1;  
+#C1: CBLN2, S100A2, SERPINA3, KRT5, GJB6;   
+#C2: S100A2, DIO2, DST, SFRP1 -- Outer Bulge;   
+#C3: COL1A1, COL1A2, COL3A1, DCN; 
+#C4: CCL14, ACKR1, CLU, CD74; 
+#C5: KRT1, KRT10, LY6D, AQP3;   
+#C6: KRT6B, KRT16, KRT6C, KRT6A;
+#C7: RGS5, ACTA2, TAGLN;   
+#C8: KRT31, KRT85, KRT35, PRR9;  
+#C9: S100A7, S100A8, S100A9, AQP3, PTN; 
+#C10: TOP2A, MKI67;  
+#C11: CD3E, IL7R -- T cells; 
+#C12: DCD, PIP -- Sweat gland cells; 
+#C13: LYZ, CD74, CD1C, C1QC;  
+#C14: TNC, LGR5, MGP, ANGPTL7;   
+#C15: TPSB2, TPSAB1; --Mast cells; 
+#C16: MYH11, MYLK, ACTA2, SYNM; 
+#C17: S100A7, S100A8, S100A9, KRT2, KRT1, KRT10; 
+#C18: DCT, PMEL, TYRP1; --Melanocytes;
+
+write_rds(N9, file = "./Cleaned_Files/N9.rds")
+```
+
+
+#Analyze these samples separately (A10);
+```{r setup, include=FALSE}
+
+A10_matrix = matrix_formation("../AGA/Rawdata/A10/AGAHF1203-A10_FKDL202623732-1a_1_Expression_Data.st", "A10")
+A10 = scObject_create(A10_matrix, "A10")
+A10 = Doublet_removal(A10, percent = 0.1)
+
+A10 = A10 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A10 = A10 %>% FindNeighbors(reduction = "pca", dims = 1:15) %>% RunUMAP(reduction = "pca", dims = 1:15) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A10 = FindClusters(A10, resolution = k)
+    print(k)
+}
+p = clustree(A10, prefix = "RNA_snn_res.") 
+A10 = FindClusters(A10, resolution = 0.5)
+
+p = Embedding_plot(A10,  vis_type = "umap", group = "RNA_snn_res.0.5", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A10_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A10)
+write.xlsx(Diff_genes, "./Processed_Files/A10_Diffs.xlsx")
+
+#C0: PODXL, FLT1, A2M, CD34, PLVAP; 
+#C1: CCL14, ACKR1, CLU, CD74;   
+#C2: KRT1, KRT10, DMKN, AQP3;  
+#C3: CBLN2, S100A2, SERPINA3, KRT5, GJB6;  
+#C4: COL1A1, COL1A2, COL3A1, DCN; 
+#C5: RGS5, ACTA2, TAGLN;  
+#C6: PTGDS, CCDC80, DCN, CFD; 
+#C7: LTF, KRT15, SAA1, MOXD1;  
+#C8: KRT1, KRT10, S100A7, S100A8, S100A9, SPINK5; 
+#C9: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C10: CD3E, IL7R -- T cells; 
+#C11: TNC, LGR5, MGP, ANGPTL7;  
+#C12: COL17A1, IGFBP3, KRT14, KRT15; 
+#C13: KRT31, KRT85, KRT35, KRT25;  
+#C14: APOD, SPON2, SFRP1; 
+#C15: CST6, SPINK5, KRT6A, KRT6B, S100A7, S100A8, S100A9; 
+#C16: TPSB2, TPSAB1; --Mast cells; 
+#C17: TOP2A, MKI67; 
+#C18: DCD, PIP -- Sweat gland cells; 
+
+write_rds(A10, file = "./Cleaned_Files/A10.rds")
+```
+
+#Analyze these samples separately (N10);
+```{r setup, include=FALSE}
+N10 = read_rds("./Processed_Files/N10.rds")
+
+N10 = N10 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N10 = N10 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N10 = FindClusters(N10, resolution = k)
+    print(k)
+}
+p = clustree(N10, prefix = "RNA_snn_res.") 
+N10 = FindClusters(N10, resolution = 0.4)
+
+p = Embedding_plot(N10,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N10_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N10)
+write.xlsx(Diff_genes, "./Processed_Files/N10_Diffs.xlsx")
+
+#C0: CBLN2, S100A2, SERPINA3, KRT5, GJB6;   
+#C1: DIO2, DST, SFRP1 -- Outer Bulge;   
+#C2: TNC, LGR5, MGP, ANGPTL7;   
+#C3: COL1A1, COL1A2, COL3A1, DCN; 
+#C4: CCL14, ACKR1, CLU, CD74; 
+#C5: KRT6B, KRT16, KRT6C, KRT6A; KRT1, KRT10, LY6D, AQP3;   
+#C6: KRT31, KRT85, KRT35, PRR9;  
+#C7: CST6, KRT1, KRT6A, KRT10, KRT6B, KRT6C, AQP3;    
+#C8: RGS5, ACTA2, TAGLN;   
+#C9: ANGPTL7, FGF18, SELENOP, EDN2; 
+#C10: TOP2A, MKI67;  
+#C11: FLT1, A2M, PLVAP, CD34, PECAM1;   
+#C12: MMP2, LUM, TNN;  DCD, PIP -- Sweat gland cells; 
+#C13: CD3E, IL7R -- T cells;
+#C14: DCT, PMEL, TYRP1; --Melanocytes;
+#C15: TPSB2, TPSAB1; --Mast cells; 
+
+write_rds(N10, file = "./Cleaned_Files/N10.rds")
+```
+
+#Analyze these samples separately (A11);
+```{r setup, include=FALSE}
+
+A11 = read_rds("./Processed_Files/A11.rds")
+A11 = A11 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A11 = A11 %>% FindNeighbors(reduction = "pca", dims = 1:16) %>% RunUMAP(reduction = "pca", dims = 1:16) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A11 = FindClusters(A11, resolution = k)
+    print(k)
+}
+p = clustree(A11, prefix = "RNA_snn_res.") 
+A11 = FindClusters(A11, resolution = 0.4)
+
+p = Embedding_plot(A11,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A11_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A11)
+write.xlsx(Diff_genes, "./Processed_Files/A11_Diffs.xlsx")
+
+#C0: KRT1, KRT10, DMKN, AQP3;   
+#C1: KRT16, KRT17, KRT6A, KRT6B, KRT6C, SERPINA3, S100A2;  
+#C2: PODXL, FLT1, A2M, CD34, PLVAP; 
+#C3: LTF, MOXD1, S100A9, S100A8, SAA1;
+#C4: DIO2, DST, SFRP1 -- Outer Bulge;    
+#C5: CCL14, ACKR1, CLU, CD74;    
+#C6: S100A7, S100A8, S100A9, CST6, KRT6A, KRT6B, KRT6C, KRT17;
+#C7: COL1A1, COL1A2, COL3A1, DCN; 
+#C8: RGS5, ACTA2, TAGLN;   
+#C9: TOP2A, MKI67; 
+#C10: IGFBP3, COL17A1, FGFR3, KRT14, DST, LAMB4;    
+#C11: DCD, PIP -- Sweat gland cells;
+#C12: KRT1, KRT10, KRTDAP, DMKN; 
+#C13: CD3E, IL7R -- T cells; 
+#C14: ANGPTL7, THBS2, LTBP2, MGP, TNC; 
+#C15: TPSB2, TPSAB1; --Mast cells; 
+#C16: TYRP1, DCT, PMEL -- Melanocytes; 
+#C17: LYZ, CD74 -- Myeloid cells; 
+
+write_rds(A11, file = "./Cleaned_Files/A11.rds")
+```
+
+
+#Analyze these samples separately (N11);
+```{r setup, include=FALSE}
+
+N11_matrix = matrix_formation("../AGA/Rawdata/N11/AGAHF1203-N11_FKDL202623732-1a_1_Expression_Data.st", "N11")
+N11 = scObject_create(N11_matrix, "N11")
+N11 = Doublet_removal(N11, percent = 0.1)
+
+N11 = N11 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N11 = N11 %>% FindNeighbors(reduction = "pca", dims = 1:18) %>% RunUMAP(reduction = "pca", dims = 1:18) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N11 = FindClusters(N11, resolution = k)
+    print(k)
+}
+p = clustree(N11, prefix = "RNA_snn_res.") 
+N11 = FindClusters(N11, resolution = 0.4)
+
+p = Embedding_plot(N11,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N11_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N11)
+write.xlsx(Diff_genes, "./Processed_Files/N11_Diffs.xlsx")
+
+#C0: CCL14, ACKR1, CLU, CD74;     
+#C1: KRT16, KRT17, KRT6A, KRT6B, KRT6C, SERPINA3, S100A2;  
+#C2: S100A7, S100A8, S100A9, KRT1, KRT10, DMKN, AQP3;    PODXL, FLT1, A2M, CD34, PLVAP; 
+#C3: DIO2, DST, SFRP1 -- Outer Bulge;     LTF, MOXD1, S100A9, S100A8, SAA1;
+#C4: COL1A1, COL1A2, COL3A1, DCN; 
+#C5: RGS5, ACTA2, TAGLN;   
+#C6: KDR, FLT1, PLVAP, RGCC;    S100A7, S100A8, S100A9, CST6, KRT6A, KRT6B, KRT6C, KRT17;
+#C7: KRT85, KRT31, KRT35, PRR9; 
+#C8: SEMA3G, IGFBP3, CLDN5; 
+#C9: CD3E, IL7R -- T cells; 
+#C10: CST6, KRT6A, KRT6B, KRT6C, KRT16, KRT17;   IGFBP3, COL17A1, FGFR3, KRT14, DST, LAMB4;    
+#C11: APOD, PTGDS, CCDC80, CFD, DCN;   
+#C12: DCD, PIP -- Sweat gland cells;
+#C13: TOP2A, MKI67; 
+#C14: TPSB2, TPSAB1; --Mast cells;  ANGPTL7, THBS2, LTBP2, MGP, TNC; 
+#C15: LYZ, CD74 --Myeloid cells;
+#C16: TYRP1, DCT, PMEL -- Melanocytes;
+#C17: MYH11, MYLK, ACTA2, SYNM; 
+
+
+write_rds(N11, file = "./Cleaned_Files/N11.rds")
+```
+
+
+#Analyze these samples separately (A12);
+```{r setup, include=FALSE}
+A12_matrix = matrix_formation("../AGA/Rawdata/A12/AGAHF1128-A12_FKDL210000305-1a_1_Expression_Data.st", "A12")
+A12 = scObject_create(A12_matrix, "A12")
+A12 = Doublet_removal(A12, percent = 0.1)
+
+A12 = A12 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A12 = A12 %>% FindNeighbors(reduction = "pca", dims = 1:19) %>% RunUMAP(reduction = "pca", dims = 1:19) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A12 = FindClusters(A12, resolution = k)
+    print(k)
+}
+p = clustree(A12, prefix = "RNA_snn_res.") 
+A12 = FindClusters(A12, resolution = 0.4)
+
+p = Embedding_plot(A12,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A12_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A12)
+write.xlsx(Diff_genes, "./Processed_Files/A12_Diffs.xlsx")
+
+#C0: KRT16, KRT17, KRT5, S100A2;   
+#C1: DIO2, DST, SFRP1 -- Outer Bulge;    
+#C2: COL1A1, COL1A2, COL3A1, DCN;  
+#C3: PODXL, FLT1, A2M, CD34, PLVAP;
+#C4: CCL14, ACKR1, CLU, CD74;    
+#C5: RGS5, ACTA2, TAGLN;   
+#C6: S100A7, S100A8, S100A9, KRT1, KRT10, DMKN, AQP3;   
+#C7: KRT35, KRT85, PRR9; 
+#C8: ANGPTL7, THBS2, FGF18, LGR5, TNC; 
+#C9: KRT16, KRT17, KRT6A, KRT6B, KRT6C, S100A2;   
+#C10: KRT35, KRT32, MSX2; 
+#C11: TOP2A, MKI67;  DCD, PIP -- Sweat gland cells;
+#C12: KRT83, KRT81, KRT31, KRT86; 
+#C13: CD3E, IL7R -- T cells; 
+#C14: TPSB2, TPSAB1; --Mast cells; 
+#C15: MYH11, MYLK, SYNM; 
+#C16: LYZ, CD74 -- Myeloid cells; 
+
+write_rds(A12, file = "./Cleaned_Files/A12.rds")
+```
+
+
+#Analyze these samples separately (N12);
+```{r setup, include=FALSE}
+
+N12 = read_rds("./Processed_Files/N12.rds")
+
+N12 = N12 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N12 = N12 %>% FindNeighbors(reduction = "pca", dims = 1:18) %>% RunUMAP(reduction = "pca", dims = 1:18) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N12 = FindClusters(N12, resolution = k)
+    print(k)
+}
+p = clustree(N12, prefix = "RNA_snn_res.") 
+N12 = FindClusters(N12, resolution = 0.4)
+
+p = Embedding_plot(N12,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N12_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N12)
+write.xlsx(Diff_genes, "./Processed_Files/N12_Diffs.xlsx")
+
+#C0: DIO2, DST, SFRP1 -- Outer Bulge;  
+#C1: KRT16, KRT17, KRT6A, KRT6B, KRT6C, SERPINA3, S100A2;  
+#C2: LTF, MOXD1, S100A9, S100A8, S100A7;   
+#C3: CCL14, ACKR1, CLU, CD74;     
+#C4: PODXL, FLT1, A2M, CD34, PLVAP;   
+#C5: COL1A1, COL1A2, COL3A1, DCN;   
+#C6: S100A7, S100A8, S100A9, KRT1, KRT10, DMKN, AQP3; 
+#C7: RGS5, ACTA2, TAGLN;   
+#C8: KRT85, KRT31, KRT35, PRR9;  
+#C9: DCD, KRT85, GPNMB, SELENBP1, MSX1; 
+#C10: IGFBP3, COL17A1, FGFR3, KRT14, DST, LAMB4;     
+#C11: KRT25, KRT73, TCHH, KRT71; 
+#C12: TOP2A, MKI67; 
+#C13: CST6, KRT6A, KRT6B, KRT6C, KRT16, KRT17, S100A7, S100A8, S100A9;   
+#C14: CD3E, IL7R -- T cells;  
+#C15: ANGPTL7, THBS2, LTBP2, MGP, TNC;  
+#C16: TPSB2, TPSAB1; --Mast cells;  
+#C17: LYZ, CD74 --Myeloid cells; 
+#C18: MYH11, MYLK, ACTA2, SYNM; 
+#C19: TYRP1, DCT, PMEL -- Melanocytes;
+#C20: FCGR3B, MNDA, CSF3R, CXCR2, FOS, RGS2; 
+
+
+write_rds(N12, file = "./Cleaned_Files/N12.rds")
+```
+
+
+#Analyze these samples separately (A13);
+```{r setup, include=FALSE}
+A13 = read_rds("./Processed_Files/A14.rds")
+A13 = A13 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+A13 = A13 %>% FindNeighbors(reduction = "pca", dims = 1:14) %>% RunUMAP(reduction = "pca", dims = 1:14) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    A13 = FindClusters(A13, resolution = k)
+    print(k)
+}
+p = clustree(A13, prefix = "RNA_snn_res.") 
+A13 = FindClusters(A13, resolution = 0.4)
+
+p = Embedding_plot(A13,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/A13_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(A13)
+write.xlsx(Diff_genes, "./Processed_Files/A13_Diffs.xlsx")
+
+#C0: RGS5, ACTA2, TAGLN;
+#C1: CD34, CLDN5, PODXL,PECAM1;    
+#C2: CCL14, ACKR1, CLU, CD74;     
+#C3: COL1A1, COL1A2, COL3A1, DCN;  
+#C4: KDR, FLT1, PLVAP, PLPP1; 
+#C5: SCUBE3, CCN2, INHBA, COL10A1, CCN1,COMP; 
+#C6: APOD, CCDC80, CFD, PTGDS;   
+#C7: LYZ, CD74 -- Myeloid cells;
+#C8: CD3E, IL7R -- T cells;   
+#C9: COL11A1, PRELP, MFAP5, THBS1; 
+#C10: KRT13, LCN2, AQP3, S100P, SERPINB3, DUOX2, KRT19, KRT7; 
+#C11: LYZ, CD74 -- Myeloid cells; 
+#C12: KRT1, KRT10, KRT6A, KRT6B, KRT6C, S100A7, S100A8, S100A9; 
+#C13: TPSB2, TPSAB1; --Mast cells; 
+#C14: KRT35, KRT85, PRR9; 
+#C15: TYRP1, PMEL, DCT; --Melanocytes; 
+
+write_rds(A13, file = "./Cleaned_Files/A13.rds")
+```
+
+#Analyze these samples separately (N13);
+```{r setup, include=FALSE}
+N13 = read_rds("./Processed_Files/N14.rds")
+N13 = N13 %>% NormalizeData() %>% ScaleData() %>% 
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    RunPCA()
+
+N13 = N13 %>% FindNeighbors(reduction = "pca", dims = 1:14) %>% RunUMAP(reduction = "pca", dims = 1:14) %>% 
+FindClusters(resolution = 0.4)
+
+#Select the appropriate resolution based on the clustree method. 
+for (k in seq(0.1, 1, 0.1)){
+    N13 = FindClusters(N13, resolution = k)
+    print(k)
+}
+p = clustree(N13, prefix = "RNA_snn_res.") 
+N13 = FindClusters(N13, resolution = 0.4)
+
+p = Embedding_plot(N13,  vis_type = "umap", group = "RNA_snn_res.0.4", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.8, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "./Processed_Files/N13_UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+
+Diff_genes = FastFindAllMarkers(N13)
+write.xlsx(Diff_genes, "./Processed_Files/N13_Diffs.xlsx")
+
+#C0: KDR, FLT1, PLVAP, PLPP1;  
+#C1: RGS5, ACTA2, TAGLN;   CD34, CLDN5, PODXL,PECAM1;    
+#C2: CCL14, ACKR1, CLU, CD74;     
+#C3: CD3E, IL7R -- T cells;    COL1A1, COL1A2, COL3A1, DCN;  
+#C4: APOD, DCN, CFD; 
+#C5: COL11A1, PRELP, MFAP5, THBS1;   SCUBE3, CCN2, INHBA, COL10A1, CCN1,COMP; 
+#C6: KRT13, LCN2, AQP3, S100P, SERPINB3, DUOX2, KRT19, KRT7;  APOD, CCDC80, CFD, PTGDS;   
+#C7: LYZ, CD74 -- Myeloid cells;
+#C8: KRT35, KRT85, PRR9; 
+#C9: LYZ, CD74 -- Myeloid cells;
+#C10: LYZ, CD74 -- Myeloid cells;
+#C11: KRT5, KRT14, KRT10; 
+#C12: NR2F1, PLAT, FBLN1, MMP2, PDPN; 
+#C13: TPSB2, TPSAB1; --Mast cells; 
+#C14: TYRP1, PMEL, DCT; --Melanocytes; 
+#C15: KRT31, PRR9, KRT85, SFN; 
+
+write_rds(N13, file = "./Cleaned_Files/N13.rds")
+```
+
+
+#Combine all the samples together and conduct the batch effects
+```{r setup, include=FALSE}
+setwd("./Cleaned_Files/")
+A1 = read_rds("A1.rds")
+N1 = read_rds("N1.rds")
+A2 = read_rds("A2.rds")
+N2 = read_rds("N2.rds")
+A3 = read_rds("A3.rds")
+N3 = read_rds("N3.rds")
+A4 = read_rds("A4.rds")
+N4 = read_rds("N4.rds")
+A5 = read_rds("A5.rds")
+N5 = read_rds("N5.rds")
+N6 = read_rds("N6.rds")
+A6 = read_rds("A6.rds")
+A7 = read_rds("A7.rds")
+N7 = read_rds("N7.rds")
+A8 = read_rds("A8.rds")
+N8 = read_rds("N8.rds")
+A9 = read_rds("A9.rds")
+N9 = read_rds("N9.rds")
+A10 = read_rds("A10.rds")
+N10 = read_rds("N10.rds")
+A11 = read_rds("A11.rds")
+N11 = read_rds("N11.rds")
+A12 = read_rds("A12.rds")
+N12 = read_rds("N12.rds")
+A13 = read_rds("A13.rds")
+N13 = read_rds("N13.rds")
+
+
+AGA = merge(A1, c(N1, A2, N2, A3, N3, A4, N4, A5, N5, N6, A6, A7, N7, A8, N8, A9, N9, A10, N10, A11, N11, A12, N12, A13, N13), project = "AGA")
+AGA = AGA %>% Seurat::NormalizeData(verbose = FALSE) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData(verbose = FALSE) %>% 
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    harmony::RunHarmony("orig.ident")
+
+AGA = AGA %>% RunUMAP(reduction = "harmony", dims = 1:25) %>% 
+      FindNeighbors(reduction = "harmony", dims = 1:25) %>% 
+      FindClusters(resolution = 0.6)
+
+write_rds(AGA, "./Cleaned_Files/AGA_new.rds")
+```
+
+
+#Conduct the downstream analysis 
+
+#Embedding plot 
+```{r setup, include=FALSE}
+p = Embedding_plot(AGA,  vis_type = "umap", group = "RNA_snn_res.0.6", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.1, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "UMAP.jpeg", dpi = 300, base_height = 12, base_width = 12)
+```
+
+
+#Find Diff genes for each cluster 
+```{r setup, include=FALSE}
+Diff_genes = FastFindAllMarkers(AGA)
+Diff_genes = RibosomeMT_genes_trim(Diff_genes)
+write.xlsx(Diff_genes, file = "All_Diffs.xlsx")
+```
+
+
+#Assign the clusters
+```{r setup, include=FALSE}
+#Final
+#Cluster 0: S100A2, KRT16, SERPINA3, KRT17, GJB6, KRT17, CBLN2, KRT5; 
+#Cluster 1: PLVAP, FLT1, KDR, CD34, AQP1, A2M, PODXL; 
+#Cluster 2: KRT1, KRT10, LY6D, KRTDAP, DMKN, S100A8, S100A7, S100A9, AQP3;
+#Cluster 3: CCL14, ACKR1, CLU, CD74, PECAM1, TSPAN7, VWF, SELE;
+#Cluster 4: COL17A1, LTF, DST, KRT15, IGFBP3, MOXD1;                                 
+#Cluster 5: DIO2, KRT15, NPNT, CXCL14, DST, SFRP1, TGFB2, COL17A1, TNC;  
+#Cluster 6: APOD, DCN, CCDC80, PTGDS, CFD, CFH, COL3A1, C1S, FBLN1, MFAP4; 
+#Cluster 7: COL1A1, COL1A2, COL11A1, COL12A1, MFAP5, COL3A1, COL6A1, LUM, TNN, POSTN;
+#CLuster 8: TRBC2, IL7R, TRAC, IL32, PTPRC, CD3E, CD3G; 
+#Cluster 9: RGS5, STEAP4, NR2F2, ABCC9, ACTA2, NOTCH3, SYNPO2, TAGLN, CD36;
+#Cluster 10: CST6, SPINK5, KRT6A, TMEM45A, KRT6B, SPRR1B, KRT17, KLK7;
+#Cluster 11: ANGPTL7, FGF18, COMP, LTBP2, LGR5, THBS2, TNC;  
+#Cluster 12: KRT6A, KRT6B, KRT16, KRT6C, DSC2, KRT17, KRT75, CST6; 
+#Cluster 13: SEMA3G, KCTD12, ADGRF5, SLC9A3R2, PODXL, FAM107A, CLDN5;   COL17A1, IGFBP3, FGFR3, LAMB4, KRT15, KRT14, TGFBI, WNT3, FOXQ1, WNT4;
+#Cluster 14: TOP2A, MKI67, CENPF, NUSAP1, TPX2, PRC1, ASPM, PTTG1, BIRC5, CENPE, RRM2;  KRT31, KRT85, KRT35, KRTAP11-1, PSORS1C2, LY6G6D, PRR9, KRT83, KRT81, KRT86;
+#Cluster 15: TCHH, KRT25, KRT71, KRT35, KRT27, KRT73, KRT32, KRT28, KRT85;
+#Cluster 16: KRT31, KRT85, KRT35, PSORS1C, PRR9;   
+#Cluster 17: MYH11, ACTA2, TAGLN, MYL9, MUSTN1;   
+#Cluster 18: LYZ, HLA-DRA, FCER1G, CD74, C1QC;    KRT6A, KRT6B, KRT16, KRT6C, KRT75, CST6;
+#Cluster 19: TPSB2, TPSAB1, CPA3, CTSG, MS4A2, KIT, HPGD, GATA2, CD69, VWA5A, CMA1, HDC, SIGLEC6;
+#Cluster 20: KRTDAP, SPRR1B, KRT2, SERPINB4, SERPINB3, S100A7, S100A8, KRT1, KRT10;                            
+#Cluster 21: DCD, PIP, MUCL1, KRT7, KRT19, SCGB1D2, SCGB1B2P, AZGP1, SERHL2, ALOX15B; HMGCS2; --sweat gland epithelial; 
+#Cluster 22: PSCA, LCN2, S100P, KRT13, GPX2, AQP3, FXYD3; 
+#Cluster 23: PMEL, TYRP1, DCT, MLANA, PLP1, SOX10, TYR, QPCT, KIT; -- Melanocytes; 
+#Cluster 24: EDN3, IGFBP3, RSPO4, SERPINE2, WNT5A, CRABP1; 
+#CLuster 25: CCL21, ACKR1, PECAM1, AQP1, CD74, PLVAP, EMCN; 
+#Cluster 26: MYH11, MYLK, SYNM, ACTA2, ACTG2, FBXO32, SA11, TAGLN; 
+#Cluster 27: CCL21, MMRN1, LYVE1, TFF3, ANGPT2, TFF3 (Doublets); 
+#Cluster 28: RGS4, CD36, STEAP4, SPARCL1, PLVAP, ACTA2, KDR; 
+#Cluster 29: SAA1, PPIA, KLK5, MOXD1, S100A7, S100A8, S100A9; 
+#Cluster 30: IL7R, CD3E, PLVAP, PECAM, (Doublets);
+#Cluster 31: IL7R, CD3E, FYB1, SPOCK2 (Doublets);
+#Cluster 32: DIO2, NPNT, KRT15, SCRG1, FREM2; 
+#Cluster 33: TRBC2, CD3D, CD3E, SPOCK2, FYB1, RGS5 (Doublets); 
+
+#Major categories:
+
+#Permanent epidermis:DSP, SFN, DSC3, DSG3, PKP1;
+#Hair Follicle: PSORS1C2, PRR9, LY6G6D, SELENBP1, MT4, ID3, DLX3, DSG4, MSX2, PPP2R1B;
+#Fibroblasts;
+#Endothelials;
+#Myeloid cells;
+#T cells;
+#Sweat gland cells;
+#Melanocytes;
+#mast cells;
+#
+
+```
+
+
+
+#Remove the doublets clusters and re-do the clustering 
+```{r setup, include=FALSE}
+#Remove the doubets: cluster 27, 30, 31, 33; 
+
+AGA = subset(AGA, RNA_snn_res.0.6 %in% c(0:26, 28, 29, 32))
+
+
+AGA = AGA %>% Seurat::NormalizeData(verbose = FALSE) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData(verbose = FALSE) %>% 
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    harmony::RunHarmony("orig.ident")
+
+AGA = AGA %>% RunUMAP(reduction = "harmony", dims = 1:25) %>% 
+      FindNeighbors(reduction = "harmony", dims = 1:25) %>% 
+      FindClusters(resolution = 0.6)
+
+```
+
+
+#Embedding plot 
+```{r setup, include=FALSE}
+p = Embedding_plot(AGA,  vis_type = "umap", group = "RNA_snn_res.0.6", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.1, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+```
+
+
+#FindMarkers Again
+```{r setup, include=FALSE}
+Diff_genes = FastFindAllMarkers(AGA)
+Diff_genes = RibosomeMT_genes_trim(Diff_genes)
+write.xlsx(Diff_genes, file = "All_Diffs_New2.xlsx")
+```
+
+
+#Assign the clusters
+```{r setup, include=FALSE}
+#Cluster 0: S100A2, KRT16, SERPINA3, KRT17, GJB6, KRT17, CBLN2, KRT5; 
+#Cluster 1: CCL14, ACKR1, CLU, CD74, PECAM1, TSPAN7, VWF, SELE;  
+#Cluster 2: KRT1, KRT10, LY6D, KRTDAP, DMKN, S100A8, S100A7, S100A9, AQP3;
+#Cluster 3: DIO2, KRT15, NPNT, CXCL14, DST, SFRP1, TGFB2, COL17A1, TNC;  
+#Cluster 4: COL1A1, COL1A2, COL11A1, COL12A1, MFAP5, COL3A1, COL6A1, LUM, TNN, POSTN;  
+#Cluster 5: PLVAP, FLT1, KDR, CD34, AQP1, A2M, PODXL; 
+#Cluster 6: LTF, MOXD1, CHI3L1, DST, SAA1, IMPA2, COL17A1; 
+#Cluster 7: CST6, SPINK5, KRT6A, TMEM45A, KRT6B, SPRR1B, KRT17, KLK7;
+#CLuster 8: APOD, CCDC80, PTGDS, DCN, CFD, CFH; 
+#Cluster 9:  TRBC2, IL7R, TRAC, IL32, PTPRC, CD3E, CD3G;  
+#Cluster 10: RGS5, STEAP4, NR2F2, ABCC9, ACTA2, NOTCH3, SYNPO2, TAGLN, CD36;
+#Cluster 11: SEMA3G, KCTD12, ADGRF5, SLC9A3R2, PODXL, FAM107A, CLDN5;    
+#Cluster 12: TOP2A, MKI67, CENPF, NUSAP1, TPX2, PRC1, ASPM, PTTG1, BIRC5, CENPE, RRM2;
+#Cluster 13: COL17A1, IGFBP3, LTF, FGFR3, LAMB4, SLC2A1, CA12, KRT15, KRT14; 
+#Cluster 14: ANGPTL7, FGF18, COMP, LTBP2, LGR5, THBS2, TNC;  
+#Cluster 15: TCHH, KRT25, KRT71, KRT35, KRT27, KRT73, KRT32, KRT28, KRT85;
+#Cluster 16: MYH11, ACTA2, TAGLN, MYL9, MUSTN1;
+#Cluster 17: LYZ, HLA-DRA, FCER1G, CD74, C1QC;
+#Cluster 18: KRT31, KRT85, KRT35, PSORS1C, PRR9;   
+#Cluster 19: TPSB2, TPSAB1, CPA3, CTSG, MS4A2, KIT, HPGD, GATA2, CD69, VWA5A, CMA1, HDC, SIGLEC6;
+#Cluster 20: DCD, PIP, MUCL1, KRT7, KRT19, SCGB1D2, SCGB1B2P, AZGP1, SERHL2, ALOX15B; HMGCS2; --sweat gland epithelial;
+#Cluster 21: KRTDAP, SPRR1B, KRT2, SERPINB4, SERPINB3, S100A7, S100A8, KRT1, KRT10;      
+#Cluster 22: PMEL, TYRP1, DCT, MLANA, PLP1, SOX10, TYR, QPCT, KIT; -- Melanocytes;
+#Cluster 23: DEFB1, KRT77, TFCP2L1, SEMA3C; 
+#Cluster 24: MYH11, MYLK, SYNM, ACTA2, ACTG2, FBXO32, SA11, TAGLN;  
+#CLuster 25: EDN3, IGFBP3, RSPO4, SERPINE2, WNT5A, CRABP1;
+#Cluster 26: CCL21, ACKR1, PECAM1, PLVAP (Doublets); 
+#Cluster 27: RGS5, CD74, PLVAP, AQP1 (Doublets); 
+#Cluster 28: SAA1, PPIA, KLK5, MOXD1, S100A7, S100A8, S100A9; 
+#Cluster 29: DIO2, NPNT, KRT15, SCRG1, FREM2; 
+#Cluster 30: IL7R, CD3E, GZMA, (Doublets);
+#Cluster 31: MYH11, RERGL,PLN (Doublets);
+#Cluster 32: TPSB2, TPSAB1, CPA3, MS4A2 (Doublets);
+```
+
+
+#Remove the doublets clusters and re-do the clustering 
+```{r setup, include=FALSE}
+#Remove the doubLets: cluster 26, 27, 30, 31, 32
+
+AGA = subset(AGA, RNA_snn_res.0.6 %in% c(0:25, 28, 29))
+
+AGA = AGA %>% Seurat::NormalizeData(verbose = FALSE) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData(verbose = FALSE) %>% 
+    RunPCA(npcs = 50, verbose = FALSE) %>%
+    harmony::RunHarmony("orig.ident")
+
+AGA = AGA %>% RunUMAP(reduction = "harmony", dims = 1:25) %>% 
+      FindNeighbors(reduction = "harmony", dims = 1:25) %>% 
+      FindClusters(resolution = 0.6)
+
+```
+
+
+#Embedding plot 
+```{r setup, include=FALSE}
+p = Embedding_plot(AGA,  vis_type = "umap", group = "RNA_snn_res.0.6", sort_type = T, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.1, point_alpha = 1) +
+  theme(legend.position = c("right"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 1, keyheight = 1.5))
+```
+
+
+#FindMarkers Again
+```{r setup, include=FALSE}
+Diff_genes = FastFindAllMarkers(AGA)
+Diff_genes = RibosomeMT_genes_trim(Diff_genes)
+write.xlsx(Diff_genes, file = "All_Diffs_New3.xlsx")
+
+write_rds(AGA, file = "./Cleaned_Files/AGA_new.rds")
+```
+
+
+
+
+#Assign the cells into major categories
+```{r , include=FALSE}
+#Major categories:
+
+#hair follicle keratinocytes: DSP, SFN, DSC3, DSG3, PKP1- (cluster: 0, 3, 4, 6, 10, 11, 12, 13, 14, 16, 19, 20, 25, 27, 28)
+
+#Fibroblasts - DCN, MFAP4, VCAN, COL3A1, COL6A2, MMP2 (cluster: 5, 15, 9)
+
+#Endothelials - FLT1, PLVAP, CD34 (cluster: 1, 2, 17)
+
+#Myeloid cells; LYZ, FCER1G, CD74 (cluster: 18)
+
+#T cells; - IL7R, PTPRC, CD34, CD3G, TRBC (cluster: 7)
+
+#Sweat gland cells; - DCD, PIP, MUCL1 (cluster: 23)
+
+#Melanocytes; - PMEL, TYRP1, MLANA, DCT (cluster: 24)
+
+#mast cells; - TPSB2, TPSAB1, CPA3 (cluster: 22)
+
+#SMC; - RGS5, ACTA2 (cluster: 8, 21, 26)
+
+
+AGA$level1_identity = mapvalues(AGA$RNA_snn_res.0.6, from = seq(0, 28, 1), to =
+                                  c("KC", "EC", "EC","KC", "KC", "FIB", "KC", 
+                                    "TC", "SMC", "FIB", "KC", "KC", "KC", "KC", 
+                                    "KC", "FIB", "KC", "EC", "MYE", "KC", "KC",
+                                    "SMC", "MAST", "SGC", "MLNC", "KC", "SMC", "KC", "KC"))
+
+
+AGA$orig.ident = mapvalues(AGA$orig.ident, from = c("D0730", "Z0730", "A14", "N14"), to = c("A1", "N1", "A13", "N13"))
+
+AGA$Type = mapvalues(AGA$orig.ident, from = c("A1","N1", "A2", "N2", "A3", "N3", "A4", "N4", "A5", "N5",
+                                                    "A6", "N6", "A7", "N7", "A8", "N8", "A9", "N9", "A10", "N10",
+                                                    "A11", "N11", "A12", "N12", "A13", "N13"),
+                     to = rep(c("Vertex", "Occipital"), 13))
+
+AGA$SampleType = mapvalues(AGA$orig.ident, from = c("A1","N1", "A2", "N2", "A3", "N3", "A4", "N4", "A5", "N5",
+                                                    "A6", "N6", "A7", "N7", "A8", "N8", "A9", "N9", "A10", "N10",
+                                                    "A11", "N11", "A12", "N12", "A13", "N13"),
+                           to = c(rep("Female", 4), rep("Male", 10), rep("Female", 4), rep("Male", "8")))
+
+write_rds(AGA, file = "AGA_Final.rds")
+```
+
+#Figure 
+```{r , include=FALSE}
+setwd("./Analysis/")
+p = Embedding_plot(AGA,  vis_type = "umap", group = "level1_identity", sort_type = F, legend_distance = 3, text_size = 8, show_text = T, user_cols = My_colors, point_size = 0.01, point_alpha = 1) +
+  theme(legend.position = c("bottom"))  + xlab("UMAP1") + ylab("UMAP2") + 
+  guides(color = guide_legend(override.aes = list(size=5),  ncol  = 4, keyheight = 1.5))
+
+cowplot::save_plot(p, filename = "UMAP_Level1.jpeg", dpi = 300, base_height = 14, base_width = 12)
+
+
+
+#Figure 
+Idents(AGA) = AGA$level1_identity
+p = cell_type_number(AGA)
+cowplot::save_plot(p, filename = "AGA_celltype_percentage.jpeg", dpi = 300, base_height = 8, base_width = 12)
+
+#Figure
+p = batch_percent_in_cluster(AGA, cluster_defined_name = "level1_identity", cell_number = F, cell_sort = F, Batch = "orig.ident", user_cols = My_colors) + guides(fill = guide_legend(override.aes = list(size=7), ncol = 8, keywidth = 1)) + 
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, size = 12)) + 
+  scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
+  ylab("Percentage%") + theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.text.x = element_text(size = 10))
+cowplot::save_plot(p, filename = "AGA_Celltype_SampleID.jpeg", dpi = 300, base_height = 8, base_width = 12)
+
+
+#Figure 
+Sample_Order = c("A1", "N1", "A2", "N2", "A3", "N3", "A4", "N4", "A5", "N5", "N6", "A6", "A7", "N7", "A8", "N8", "A9", "N9", "A10", "N10", "A11", "N11", "A12", "N12", "A13", "N13")
+                
+p = batch_percent_in_cluster(AGA, cluster_defined_name = "orig.ident", cell_number = F, cell_sort = T, Batch = "level1_identity", user_cols = My_colors7, cluster_Order = Sample_Order) + guides(fill = guide_legend(override.aes = list(size=7), ncol = 8, keywidth = 1)) + 
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, size = 12)) + 
+  scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 10)) +
+  ylab("Percentage%") + theme(axis.title.y = element_text(size = 15, angle = 90, face = "bold")) +
+  theme(axis.text.x = element_text(size = 10))
+cowplot::save_plot(p, filename = "AGA_SampleID_Celltype.jpeg", dpi = 300, base_height = 8, base_width = 12)
+
+
+#Figure 
+KeyMarkers = c("DSC3", "SFN", "FLT1", "PLVAP", "DCN", "VCAN", "RGS5", "ACTA2", "CD3D", "CD3G", "LYZ", "CD74",
+               "TPSB2", "TPSAB1", "DCD", "PIP", "PMEL", "TYRP1", "CCL21", "MMRN1")
+p = StackedVlnPlot(AGA, features = KeyMarkers)
+cowplot::save_plot(p, filename = "AGA_marker.jpeg", dpi = 300, base_height = 20, base_width = 16)
+cowplot::save_plot(p, filename = "AGA_marker.pdf", dpi = 300, base_height = 20, base_width = 16)
+```
+
+
