@@ -1,0 +1,105 @@
+
+AGA$level3_identity <- as.character(AGA$level2_identity)
+
+# 3. 定义一个包含【所有】合并规则的完整“字典”
+
+# -----------------
+# (A) 旧名称 (from) - 共 53 个需要合并的名称
+# -----------------
+old_names_all <- c(
+  # Basal (6)
+  "Basal_1", "Basal_2", "Basal_3", "Basal_4", "Basal_5", "Basal_6",
+  # Suprabasal (3)
+  "Suprabasal_1", "Suprabasal_2", "Suprabasal_3",
+  # Cortex (4)
+  "Cortex_1", "Cortex_2", "Cortex_3", "Cortex_4",
+  # Eccrine (2)
+  "Eccrine_1", "Eccrine_2",
+  # FIB (5)
+  "FIB1", "FIB2", "FIB3", "FIB4", "FIB5",
+  # Muscle (3)
+  "CD36+ Muscle", "CCL19+ Muscle", "MYH11+ Muscle",
+  # CD4+ T (2)
+  "CD4+ naive", "CD4+ activated naive",
+  # CD8+ T (4)
+  "CD8+ effector-GNLY", "CD8+ effector memory", "CD8+ effector-GZMK", "CD8+ activated",
+  # Myeloid (10)
+  "Proliferative Macrophage", "FCGR3A+ macrophage", "FOLR2+ macrophage", 
+  "SPP1+ macrophages", "MCEMP1+ M1 macrophage", "S100A12+ macrophage", 
+  "CLEC10A+ cDC", "LAMP3+ cDC", "CLEC9A+ cDC", "Langerhans",
+  # Epidermal progenitors (3)
+  "Epidermal progenitors_1", "Epidermal progenitors_2", "Epidermal progenitors_3",
+  # Hair matrix (2)
+  "Hair matrix_1", "Hair matrix_2",
+  # IRS (3)
+  "Henle layer", "Huxley layer", "IRS cuticle",
+  # Melanocyte (3)
+  "Melanocyte_1", "Melanocyte_2", "Melanocyte_3",
+  # DS (1)
+  "DS1",
+  # ORS (2)
+  "ORS_1", "ORS_2"
+)
+
+# -----------------
+# (B) 新名称 (to) - 对应 15 个合并后的群
+# -----------------
+new_names_all <- c(
+  # Basal
+  rep("Basal", 6),
+  # Suprabasal
+  rep("Suprabasal", 3),
+  # Cortex
+  rep("Cortex", 4),
+  # Eccrine
+  rep("Eccrine", 2),
+  # FIB
+  rep("FIB", 5),
+  # Muscle
+  rep("Muscle", 3),
+  # CD4+ T
+  rep("CD4+ T", 2),
+  # CD8+ T
+  rep("CD8+ T", 4),
+  # Myeloid
+  rep("Myeloid", 10),
+  # Epidermal progenitors
+  rep("Epidermal progenitors", 3),
+  # Hair matrix
+  rep("Hair matrix", 2),
+  # IRS
+  rep("IRS", 3),
+  # Melanocyte
+  rep("Melanocyte", 3),
+  # DS
+  "DS",
+  # ORS
+  rep("ORS", 2)
+)
+
+# 4. (关键步骤) 使用 plyr::mapvalues 一次性执行所有重命名
+# 确保你已经安装了 'plyr' 包 (install.packages("plyr"))
+# 如果尚未加载，请运行: library(plyr)
+#
+# warn_missing = FALSE 告诉函数不要警告那些我们“未提及”的群组 (如 DP, Treg 等)
+AGA$level3_identity <- plyr::mapvalues(
+  x = AGA$level3_identity,
+  from = old_names_all,
+  to = new_names_all,
+  warn_missing = FALSE 
+)
+
+# 5. (推荐) 将新列转回 factor 格式
+# 这对于后续使用 DimPlot 等函数按顺序展示细胞类型有好处
+AGA$level3_identity <- factor(AGA$level3_identity)
+
+# 6. (验证) 检查你的新 'level3_identity'
+print("成功创建 'level3_identity'。")
+print("level3_identity 包含的群组 (共 27 个):")
+print(levels(AGA$level3_identity))
+
+# 7. (验证) 检查 'level2_identity' 是否保持不变
+print("--------------------")
+print(paste0("'level2_identity' 仍然存在且未被修改，包含 ", 
+             length(unique(AGA$level2_identity)), 
+             " 个亚群。"))
