@@ -27,7 +27,7 @@ scv.settings.verbosity = 3
 
 # --- 1. Read merged h5ad (loom data + Seurat annotations) ---
 # [USER: set path] to the merged anndata file
-adata = sc.read_h5ad("hfsc_merged_final.h5ad")
+adata = sc.read_h5ad("hfsc.h5ad")
 
 # Ensure categorical metadata
 adata.obs["level2_identity"] = adata.obs["level2_identity"].astype("category")
